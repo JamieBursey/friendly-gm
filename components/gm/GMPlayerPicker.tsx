@@ -7,6 +7,7 @@ import {
   Text,
   TextInput,
   View,
+  ScrollView
 } from "react-native";
 import { useDebounce } from "@/components/hooks/useDebounce"; // wherever you put it
 import { colors } from "@/components/theme/colors";
@@ -17,6 +18,12 @@ type SearchResult = {
   playerId: string;
   name: string;
   currentTeamAbbrev?: string;
+};
+type ActivePlayer = {
+  playerId: string;
+  name: string;
+  position: string;     // "C" | "LW" | "RW" | "D" | "G"
+  teamAbbrev?: string;
 };
 
 type PlayerProfile = {
@@ -172,6 +179,75 @@ const counts = useMemo<RosterCounts>(() => {
     setGmRoster((prev) => prev.filter((p) => p.id !== id));
   };
   
+  function shuffle<T>(arr: T[]): T[] {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+  
+  const fetchActivePool = async (): Promise<ActivePlayer[]> => {
+    const res = await fetch(`${API_BASE}/api/active`);
+    if (!res.ok) throw new Error("Failed to load active players");
+    const data: ActivePlayer[] = await res.json();
+    return data;
+  };
+  
+  const autoFillRoster = async () => {
+    setError(null);
+    setLoadingProfile(true); // or create a new autoFillLoading state
+  
+    try {
+      // reset
+      setGmRoster([]);
+      setSelected(null);
+      setQuery("");
+      setSuggestions([]);
+      setShowSuggestions(false);
+  
+      const pool = shuffle(await fetchActivePool());
+  
+      let needF = ROSTER_RULES.F;
+      let needD = ROSTER_RULES.D;
+      let needG = ROSTER_RULES.G;
+  
+      const picked: PlayerProfile[] = [];
+
+      for (const p of pool) {
+        if (picked.length >= ROSTER_RULES.TOTAL) break;
+      
+        const role = getRole(p.position);
+      
+        if (role === "F" && needF <= 0) continue;
+        if (role === "D" && needD <= 0) continue;
+        if (role === "G" && needG <= 0) continue;
+        if (role === "?") continue;
+      
+        const profile = await fetchPlayerProfile(p.playerId);
+        if (!profile) continue;
+      
+        if (picked.some(x => x.id === profile.id)) continue;
+      
+        picked.push(profile);
+      
+        if (role === "F") needF--;
+        if (role === "D") needD--;
+        if (role === "G") needG--;
+      }
+  
+      if (picked.length !== ROSTER_RULES.TOTAL) {
+        setError("Auto-fill couldn’t complete the roster. Try again.");
+      }
+  
+      setGmRoster(picked);
+    } catch (e:any) {
+      setError(e?.message ?? "Auto-fill failed");
+    } finally {
+      setLoadingProfile(false);
+    }
+  };
   const styles = StyleSheet.create({
     container: {
       flex: 1,
@@ -244,12 +320,15 @@ const counts = useMemo<RosterCounts>(() => {
     },
   });
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container}>
       <Text style={typography.h1}>GM Home</Text>
       
       <Text style={[typography.body, { marginTop: spacing.md }]}>
   Roster: {counts.total}/{ROSTER_RULES.TOTAL} — F {counts.F}/{ROSTER_RULES.F} • D {counts.D}/{ROSTER_RULES.D} • G {counts.G}/{ROSTER_RULES.G}
 </Text>
+<Pressable style={styles.primaryButton} onPress={autoFillRoster}>
+  <Text style={styles.primaryButtonText}>Auto Fill Roster</Text>
+</Pressable>
       <Text style={[typography.body, { marginTop: spacing.sm }]}>
         Search any NHL player and add them to your team.
       </Text>
@@ -374,7 +453,7 @@ const counts = useMemo<RosterCounts>(() => {
 )}
   </View>
 )}
-    </View>
+    </ScrollView>
   );
 }
 
