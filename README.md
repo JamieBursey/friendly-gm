@@ -1,50 +1,132 @@
-# Welcome to your Expo app 👋
+# Friendly GM - NHL Fantasy & Card Game App
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+This is a [React Native](https://reactnative.dev/) project created with [Expo](https://expo.dev), featuring:
+
+- 🏒 **GM Mode**: Build NHL rosters and compete with friends
+- 🃏 **Card Game**: Yu-Gi-Oh style battle system with NHL player cards
+- 👥 **Social**: Connect with friends from your existing friendlyBets network
+- 📊 **Progression**: Level up and unlock new cards
+
+## Tech Stack
+
+- **React Native** with Expo
+- **TypeScript** for type safety
+- **Supabase** for backend (auth, database, real-time)
+- **Expo Router** for file-based navigation
 
 ## Get started
 
-1. Install dependencies
+### 1. Install dependencies
 
-   ```bash
-   npm install
-   ```
+```bash
+npm install
+```
 
-2. Start the app
+### 2. Set up Supabase
 
-   ```bash
-   npx expo start
-   ```
+Follow the complete guide in [SUPABASE_SETUP.md](./SUPABASE_SETUP.md)
+
+Quick steps:
+
+1. Get your Supabase credentials from the dashboard
+2. Copy `.env.example` to `.env` and fill in your credentials
+3. Run the SQL scripts to create database tables
+4. Test the connection
+
+### 3. Start the app
+
+```bash
+npx expo start
+```
 
 In the output, you'll find options to open the app in a
 
 - [development build](https://docs.expo.dev/develop/development-builds/introduction/)
 - [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
 - [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+- [Expo Go](https://expo.dev/go)
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+## Project Structure
 
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```
+app/
+  (tabs)/           # Tab navigation screens
+    index.tsx       # GM Mode home
+    explore.tsx     # Card Game home
+  _layout.tsx       # Root layout with AuthProvider
+components/
+  auth/             # Authentication screens
+  gm/               # GM Mode components
+  game/             # Game logic and progression
+  services/         # API and data services
+  theme/            # Design system (colors, spacing, typography)
+contexts/
+  AuthContext.tsx   # Authentication state management
+lib/
+  supabase.ts       # Supabase client configuration
+services/
+  database.ts       # Database service layer
+  cards.ts          # Card game services
+types/
+  database.ts       # TypeScript types for database schema
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Features
+
+### GM Mode ✅ (70% Complete)
+
+- [x] NHL player search with autocomplete
+- [x] Roster builder (15F, 8D, 2G = 25 total)
+- [x] Auto-fill roster feature
+- [x] Custom theming
+- [ ] Save rosters to database
+- [ ] Point tracking system
+- [ ] Live scoring
+- [ ] Multiplayer matchmaking
+- [ ] Leaderboards
+
+### Card Game 🚧 (In Progress)
+
+- [ ] Card collection system
+- [ ] Battle UI
+- [ ] Turn-based gameplay
+- [ ] Card abilities
+- [ ] Progression & leveling
+- [ ] Pack opening
+
+### Social Features 🚧 (In Progress)
+
+- [x] Supabase authentication
+- [x] Database schema designed
+- [ ] Friend management UI
+- [ ] Friend requests
+- [ ] Challenge system
+- [ ] Chat/messaging
+
+## Development
+
+### Running Tests
+
+```bash
+npm test
+```
+
+### Linting
+
+```bash
+npm run lint
+```
 
 ## Learn more
 
-To learn more about developing your project with Expo, look at the following resources:
+- [Expo documentation](https://docs.expo.dev/)
+- [React Native documentation](https://reactnative.dev/)
+- [Supabase documentation](https://supabase.com/docs)
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## Contributing
 
-## Join the community
+This is a personal project, but suggestions and feedback are welcome!
 
-Join our community of developers creating universal apps.
+## License
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+MIT

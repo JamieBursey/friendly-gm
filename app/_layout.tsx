@@ -1,22 +1,13 @@
-import { Tabs } from "expo-router";
-import { colors } from "@/components/theme/colors";
+import { AuthProvider } from "@/contexts/AuthContext";
+import { Stack } from "expo-router";
 
-export default function TabLayout() {
+export default function RootLayout() {
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarStyle: {
-          backgroundColor: colors.card,
-          borderTopColor: colors.border,
-        },
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textMuted,
-      }}
-    >
-      <Tabs.Screen name="index" options={{ title: "GM" }} />
-      <Tabs.Screen name="roster" options={{ title: "Roster" }} />
-      <Tabs.Screen name="explore" options={{ title: "Explore" }} />
-    </Tabs>
+    <AuthProvider>
+      <Stack>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="modal" options={{ presentation: "modal" }} />
+      </Stack>
+    </AuthProvider>
   );
 }
