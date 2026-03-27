@@ -7,6 +7,8 @@ import { cardService } from "@/services/cards";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
     ActivityIndicator,
+    Animated,
+    Easing,
     FlatList,
     Image,
     Modal,
@@ -57,6 +59,45 @@ const typeColor: Record<CardType, string> = {
   legendary: colors.danger,
 };
 
+const getModalFlavorText = (card: NonNullable<CollectionRow["card"]>) => {
+  if (card.type === "legendary") {
+    return {
+      eyebrow: "Legacy-tier pull",
+      description:
+        "A top-shelf signature card built to anchor a lineup. Legendary cards carry premium ceilings and the strongest table presence in the collection.",
+      highlights: [
+        { label: "Burst", value: Math.max(card.attack, card.defense) },
+        { label: "Aura", value: card.attack + card.defense },
+        { label: "Class", value: "Mythic" },
+      ],
+    };
+  }
+
+  if (card.type === "special") {
+    return {
+      eyebrow: "Featured impact card",
+      description:
+        "Special cards sit above the standard roster curve. They are tuned to swing momentum with stronger traits and sharper ability profiles.",
+      highlights: [
+        { label: "Pressure", value: card.attack },
+        { label: "Control", value: card.defense },
+        { label: "Trait", value: "Elite" },
+      ],
+    };
+  }
+
+  return {
+    eyebrow: "Roster core card",
+    description:
+      "Standard player cards are generated from current roster production and form the reliable backbone of your collection.",
+    highlights: [
+      { label: "Attack", value: card.attack },
+      { label: "Defense", value: card.defense },
+      { label: "Tier", value: card.rarity.toUpperCase() },
+    ],
+  };
+};
+
 export default function MyCardsScreen() {
   const { loading, user } = useAuth();
   const [cards, setCards] = useState<CollectionRow[]>([]);
@@ -65,6 +106,8 @@ export default function MyCardsScreen() {
   const [filterMode, setFilterMode] = useState<FilterMode>("all");
   const [sortMode, setSortMode] = useState<SortMode>("rarity");
   const [selectedCard, setSelectedCard] = useState<CollectionRow | null>(null);
+  const modalEntrance = useState(() => new Animated.Value(0))[0];
+  const modalShimmer = useState(() => new Animated.Value(0))[0];
 
   const loadCards = useCallback(async () => {
     if (!user?.id) return;
@@ -148,6 +191,89 @@ export default function MyCardsScreen() {
       return right.card.attack - left.card.attack;
     });
   }, [cards, filterMode, sortMode]);
+
+  const modalFlavor = useMemo(() => {
+    if (!selectedCard?.card) return null;
+    return getModalFlavorText(selectedCard.card);
+  }, [selectedCard]);
+
+  const modalIsFeatured =
+    selectedCard?.card?.type !== "player" ||
+    selectedCard?.card?.rarity === "legendary";
+
+  useEffect(() => {
+    if (!selectedCard?.card) {
+      modalEntrance.stopAnimation();
+      modalShimmer.stopAnimation();
+      modalEntrance.setValue(0);
+      modalShimmer.setValue(0);
+      return;
+    }
+
+    modalEntrance.setValue(0);
+    Animated.spring(modalEntrance, {
+      toValue: 1,
+      damping: 18,
+      stiffness: 180,
+      mass: 0.9,
+      useNativeDriver: true,
+    }).start();
+
+    modalShimmer.stopAnimation();
+    modalShimmer.setValue(0);
+
+    if (modalIsFeatured) {
+      Animated.loop(
+        Animated.timing(modalShimmer, {
+          toValue: 1,
+          duration: selectedCard.card.rarity === "legendary" ? 1500 : 1800,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ).start();
+    }
+
+    return () => {
+      modalEntrance.stopAnimation();
+      modalShimmer.stopAnimation();
+    };
+  }, [modalEntrance, modalIsFeatured, modalShimmer, selectedCard]);
+
+  const modalCardAnimatedStyle = {
+    opacity: modalEntrance,
+    transform: [
+      {
+        translateY: modalEntrance.interpolate({
+          inputRange: [0, 1],
+          outputRange: [26, 0],
+        }),
+      },
+      {
+        scale: modalEntrance.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0.96, 1],
+        }),
+      },
+    ],
+  };
+
+  const shimmerAnimatedStyle = {
+    opacity: modalIsFeatured
+      ? modalShimmer.interpolate({
+          inputRange: [0, 0.5, 1],
+          outputRange: [0.12, 0.26, 0.12],
+        })
+      : 0,
+    transform: [
+      {
+        translateX: modalShimmer.interpolate({
+          inputRange: [0, 1],
+          outputRange: [-220, 260],
+        }),
+      },
+      { rotate: "18deg" },
+    ],
+  };
 
   if (loading) {
     return (
@@ -381,7 +507,7 @@ export default function MyCardsScreen() {
         onRequestClose={() => setSelectedCard(null)}
       >
         <View style={styles.modalBackdrop}>
-          <View
+          <Animated.View
             style={[
               styles.modalCard,
               selectedCard?.card?.rarity === "legendary" &&
@@ -390,6 +516,7 @@ export default function MyCardsScreen() {
                 (selectedCard.card.type !== "player" ||
                   selectedCard.card.rarity === "legendary") &&
                 styles.modalCardElite,
+              modalCardAnimatedStyle,
             ]}
           >
             {selectedCard?.card && (
@@ -421,6 +548,12 @@ export default function MyCardsScreen() {
                         {selectedCard.card.name}
                       </Text>
                     </View>
+                  )}
+                  {modalIsFeatured && (
+                    <Animated.View
+                      pointerEvents="none"
+                      style={[styles.modalShimmerBeam, shimmerAnimatedStyle]}
+                    />
                   )}
                 </View>
 
@@ -509,12 +642,29 @@ export default function MyCardsScreen() {
                   </View>
                 </View>
 
-                <Text style={styles.modalMeta}>
-                  {selectedCard.card.type !== "player" ||
-                  selectedCard.card.rarity === "legendary"
-                    ? "Featured card with elevated stats and special ability profile."
-                    : "Standard roster card generated from current player data."}
+                <Text style={styles.modalMeta}>{modalFlavor?.eyebrow}</Text>
+                <Text style={styles.modalDescription}>
+                  {modalFlavor?.description}
                 </Text>
+
+                <View style={styles.modalCalloutRow}>
+                  {modalFlavor?.highlights.map((highlight) => (
+                    <View key={highlight.label} style={styles.modalCalloutCard}>
+                      <Text style={styles.modalCalloutLabel}>
+                        {highlight.label}
+                      </Text>
+                      <Text
+                        style={styles.modalCalloutValue}
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                        minimumFontScale={0.6}
+                      >
+                        {highlight.value}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+
                 <Text style={styles.modalStats}>
                   ATK {selectedCard.card.attack} | DEF{" "}
                   {selectedCard.card.defense}
@@ -531,7 +681,7 @@ export default function MyCardsScreen() {
                 </Pressable>
               </>
             )}
-          </View>
+          </Animated.View>
         </View>
       </Modal>
     </View>
@@ -738,6 +888,15 @@ const styles = StyleSheet.create({
     height: 6,
     zIndex: 2,
   },
+  modalShimmerBeam: {
+    position: "absolute",
+    top: -40,
+    bottom: -40,
+    width: 120,
+    backgroundColor: "rgba(255,255,255,0.16)",
+    borderRadius: 999,
+    zIndex: 3,
+  },
   modalArt: {
     width: "100%",
     height: "100%",
@@ -822,6 +981,40 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
     fontWeight: "600",
     lineHeight: 18,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+  modalDescription: {
+    color: colors.textPrimary,
+    marginTop: spacing.sm,
+    lineHeight: 21,
+  },
+  modalCalloutRow: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
+  modalCalloutCard: {
+    flex: 1,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 16,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  modalCalloutLabel: {
+    color: colors.textMuted,
+    fontSize: 11,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  modalCalloutValue: {
+    color: colors.textPrimary,
+    fontSize: 16,
+    fontWeight: "800",
+    marginTop: 6,
   },
   modalStats: {
     color: colors.textSecondary,
