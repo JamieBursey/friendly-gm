@@ -8,11 +8,19 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
     ActivityIndicator,
     FlatList,
+    Image,
+    Modal,
     Pressable,
+    ScrollView,
     StyleSheet,
     Text,
     View,
 } from "react-native";
+
+type CardRarity = "common" | "rare" | "epic" | "legendary";
+type CardType = "player" | "special" | "legendary";
+type FilterMode = "all" | CardRarity;
+type SortMode = "rarity" | "attack" | "defense" | "name";
 
 type CollectionRow = {
   id: string;
@@ -20,7 +28,8 @@ type CollectionRow = {
   card: {
     id: string;
     name: string;
-    rarity: "common" | "rare" | "epic" | "legendary";
+    type: CardType;
+    rarity: CardRarity;
     attack: number;
     defense: number;
     special_ability: string | null;
@@ -28,11 +37,24 @@ type CollectionRow = {
   } | null;
 };
 
-const rarityColor: Record<"common" | "rare" | "epic" | "legendary", string> = {
+const rarityColor: Record<CardRarity, string> = {
   common: "#6E7C99",
   rare: "#4DA3FF",
   epic: "#FFB454",
   legendary: "#FF5C7A",
+};
+
+const rarityWeight: Record<CardRarity, number> = {
+  common: 1,
+  rare: 2,
+  epic: 3,
+  legendary: 4,
+};
+
+const typeColor: Record<CardType, string> = {
+  player: colors.textSecondary,
+  special: colors.warning,
+  legendary: colors.danger,
 };
 
 export default function MyCardsScreen() {
@@ -40,6 +62,9 @@ export default function MyCardsScreen() {
   const [cards, setCards] = useState<CollectionRow[]>([]);
   const [loadingCards, setLoadingCards] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [filterMode, setFilterMode] = useState<FilterMode>("all");
+  const [sortMode, setSortMode] = useState<SortMode>("rarity");
+  const [selectedCard, setSelectedCard] = useState<CollectionRow | null>(null);
 
   const loadCards = useCallback(async () => {
     if (!user?.id) return;
@@ -60,6 +85,7 @@ export default function MyCardsScreen() {
             card: {
               id: rawCard.id,
               name: rawCard.name,
+              type: rawCard.type,
               rarity: rawCard.rarity,
               attack: rawCard.attack,
               defense: rawCard.defense,
@@ -83,13 +109,45 @@ export default function MyCardsScreen() {
   }, [loadCards]);
 
   const summary = useMemo(() => {
-    const totals = { common: 0, rare: 0, epic: 0, legendary: 0 };
-    for (const row of cards) {
-      const rarity = row.card?.rarity;
-      if (rarity) totals[rarity] += row.quantity;
-    }
-    return totals;
+    return cards.reduce(
+      (acc: Record<CardRarity, number>, item) => {
+        if (item.card) {
+          acc[item.card.rarity] += item.quantity;
+        }
+        return acc;
+      },
+      { common: 0, rare: 0, epic: 0, legendary: 0 },
+    );
   }, [cards]);
+
+  const visibleCards = useMemo(() => {
+    const filtered = cards.filter((item) => {
+      if (!item.card) return false;
+      if (filterMode === "all") return true;
+      return item.card.rarity === filterMode;
+    });
+
+    return [...filtered].sort((left, right) => {
+      if (!left.card || !right.card) return 0;
+
+      if (sortMode === "attack") {
+        return right.card.attack - left.card.attack;
+      }
+
+      if (sortMode === "defense") {
+        return right.card.defense - left.card.defense;
+      }
+
+      if (sortMode === "name") {
+        return left.card.name.localeCompare(right.card.name);
+      }
+
+      const rarityDelta =
+        rarityWeight[right.card.rarity] - rarityWeight[left.card.rarity];
+      if (rarityDelta !== 0) return rarityDelta;
+      return right.card.attack - left.card.attack;
+    });
+  }, [cards, filterMode, sortMode]);
 
   if (loading) {
     return (
@@ -128,6 +186,107 @@ export default function MyCardsScreen() {
         </Pressable>
       </View>
 
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.chipRow}
+      >
+        <Pressable
+          style={[styles.chip, filterMode === "all" && styles.chipActive]}
+          onPress={() => setFilterMode("all")}
+        >
+          <Text
+            style={[
+              styles.chipText,
+              filterMode === "all" && styles.chipTextActive,
+            ]}
+          >
+            All
+          </Text>
+        </Pressable>
+        {(["common", "rare", "epic", "legendary"] as CardRarity[]).map(
+          (rarity) => (
+            <Pressable
+              key={rarity}
+              style={[
+                styles.chip,
+                filterMode === rarity && styles.chipActive,
+                filterMode === rarity && { borderColor: rarityColor[rarity] },
+              ]}
+              onPress={() => setFilterMode(rarity)}
+            >
+              <Text
+                style={[
+                  styles.chipText,
+                  filterMode === rarity && { color: rarityColor[rarity] },
+                ]}
+              >
+                {rarity.toUpperCase()}
+              </Text>
+            </Pressable>
+          ),
+        )}
+      </ScrollView>
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.chipRowCompact}
+      >
+        <Pressable
+          style={[styles.chip, sortMode === "rarity" && styles.chipActive]}
+          onPress={() => setSortMode("rarity")}
+        >
+          <Text
+            style={[
+              styles.chipText,
+              sortMode === "rarity" && styles.chipTextActive,
+            ]}
+          >
+            Sort: Rarity
+          </Text>
+        </Pressable>
+        <Pressable
+          style={[styles.chip, sortMode === "attack" && styles.chipActive]}
+          onPress={() => setSortMode("attack")}
+        >
+          <Text
+            style={[
+              styles.chipText,
+              sortMode === "attack" && styles.chipTextActive,
+            ]}
+          >
+            Sort: ATK
+          </Text>
+        </Pressable>
+        <Pressable
+          style={[styles.chip, sortMode === "defense" && styles.chipActive]}
+          onPress={() => setSortMode("defense")}
+        >
+          <Text
+            style={[
+              styles.chipText,
+              sortMode === "defense" && styles.chipTextActive,
+            ]}
+          >
+            Sort: DEF
+          </Text>
+        </Pressable>
+        <Pressable
+          style={[styles.chip, sortMode === "name" && styles.chipActive]}
+          onPress={() => setSortMode("name")}
+        >
+          <Text
+            style={[
+              styles.chipText,
+              sortMode === "name" && styles.chipTextActive,
+            ]}
+          >
+            Sort: Name
+          </Text>
+        </Pressable>
+      </ScrollView>
+
       {loadingCards && (
         <View style={{ marginTop: spacing.md }}>
           <ActivityIndicator color={colors.primary} />
@@ -136,11 +295,17 @@ export default function MyCardsScreen() {
 
       {error && <Text style={styles.error}>{error}</Text>}
 
-      {!loadingCards && cards.length === 0 && !error && (
+      {!loadingCards && visibleCards.length === 0 && !error && (
         <View style={styles.emptyState}>
-          <Text style={typography.body}>No cards yet.</Text>
+          <Text style={typography.body}>
+            {cards.length === 0
+              ? "No cards yet."
+              : "No cards match the current filter."}
+          </Text>
           <Text style={[typography.caption, { marginTop: spacing.sm }]}>
-            Save your roster in GM mode to generate and sync cards.
+            {cards.length === 0
+              ? "Save your roster in GM mode to generate and sync cards."
+              : "Try another rarity filter or sort mode."}
           </Text>
         </View>
       )}
@@ -150,14 +315,32 @@ export default function MyCardsScreen() {
           paddingTop: spacing.md,
           paddingBottom: spacing.xl,
         }}
-        data={cards}
+        data={visibleCards}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => {
           if (!item.card) return null;
 
           return (
-            <View style={styles.cardRow}>
-              <View style={{ flex: 1 }}>
+            <Pressable
+              style={styles.cardRow}
+              onPress={() => setSelectedCard(item)}
+            >
+              <View style={styles.cardPreview}>
+                {item.card.image_url ? (
+                  <Image
+                    source={{ uri: item.card.image_url }}
+                    style={styles.cardArt}
+                  />
+                ) : (
+                  <View style={styles.cardArtPlaceholder}>
+                    <Text style={styles.cardArtPlaceholderText}>
+                      {item.card.rarity.toUpperCase()}
+                    </Text>
+                  </View>
+                )}
+              </View>
+
+              <View style={styles.cardContent}>
                 <View style={styles.titleRow}>
                   <Text style={styles.cardName}>{item.card.name}</Text>
                   <View
@@ -181,15 +364,176 @@ export default function MyCardsScreen() {
                   ATK {item.card.attack} | DEF {item.card.defense} | Qty{" "}
                   {item.quantity}
                 </Text>
-
-                <Text style={styles.abilityText}>
+                <Text style={styles.typeText}>Type: {item.card.type}</Text>
+                <Text numberOfLines={2} style={styles.abilityText}>
                   {item.card.special_ability ?? "No special ability."}
                 </Text>
               </View>
-            </View>
+            </Pressable>
           );
         }}
       />
+
+      <Modal
+        animationType="fade"
+        transparent
+        visible={!!selectedCard}
+        onRequestClose={() => setSelectedCard(null)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View
+            style={[
+              styles.modalCard,
+              selectedCard?.card?.rarity === "legendary" &&
+                styles.modalCardLegendary,
+              selectedCard?.card &&
+                (selectedCard.card.type !== "player" ||
+                  selectedCard.card.rarity === "legendary") &&
+                styles.modalCardElite,
+            ]}
+          >
+            {selectedCard?.card && (
+              <>
+                <View
+                  style={[
+                    styles.modalPreview,
+                    { borderColor: rarityColor[selectedCard.card.rarity] },
+                    selectedCard.card.rarity === "legendary" &&
+                      styles.modalPreviewLegendary,
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.modalAccentBar,
+                      {
+                        backgroundColor: rarityColor[selectedCard.card.rarity],
+                      },
+                    ]}
+                  />
+                  {selectedCard.card.image_url ? (
+                    <Image
+                      source={{ uri: selectedCard.card.image_url }}
+                      style={styles.modalArt}
+                    />
+                  ) : (
+                    <View style={styles.modalArtPlaceholder}>
+                      <Text style={styles.modalArtPlaceholderText}>
+                        {selectedCard.card.name}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+
+                <View style={styles.modalHeader}>
+                  <View style={styles.modalHeaderContent}>
+                    <Text style={styles.modalName}>
+                      {selectedCard.card.name}
+                    </Text>
+
+                    <View style={styles.modalBadgeRow}>
+                      <View
+                        style={[
+                          styles.modalBadge,
+                          {
+                            borderColor: rarityColor[selectedCard.card.rarity],
+                          },
+                          styles.modalBadgeStrong,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.modalBadgeText,
+                            { color: rarityColor[selectedCard.card.rarity] },
+                          ]}
+                        >
+                          {selectedCard.card.rarity.toUpperCase()}
+                        </Text>
+                      </View>
+
+                      <View
+                        style={[
+                          styles.modalBadge,
+                          { borderColor: typeColor[selectedCard.card.type] },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.modalBadgeText,
+                            { color: typeColor[selectedCard.card.type] },
+                          ]}
+                        >
+                          {selectedCard.card.type.toUpperCase()}
+                        </Text>
+                      </View>
+
+                      <View style={styles.modalBadge}>
+                        <Text style={styles.modalBadgeText}>
+                          QTY {selectedCard.quantity}
+                        </Text>
+                      </View>
+
+                      {(selectedCard.card.type !== "player" ||
+                        selectedCard.card.rarity === "legendary") && (
+                        <View
+                          style={[styles.modalBadge, styles.modalEliteBadge]}
+                        >
+                          <Text
+                            style={[
+                              styles.modalBadgeText,
+                              styles.modalEliteBadgeText,
+                            ]}
+                          >
+                            ELITE
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+
+                  <View
+                    style={[
+                      styles.modalBadgeOrb,
+                      { borderColor: rarityColor[selectedCard.card.rarity] },
+                      selectedCard.card.rarity === "legendary" &&
+                        styles.modalBadgeOrbLegendary,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.modalBadgeOrbText,
+                        { color: rarityColor[selectedCard.card.rarity] },
+                      ]}
+                    >
+                      {selectedCard.card.attack + selectedCard.card.defense}
+                    </Text>
+                  </View>
+                </View>
+
+                <Text style={styles.modalMeta}>
+                  {selectedCard.card.type !== "player" ||
+                  selectedCard.card.rarity === "legendary"
+                    ? "Featured card with elevated stats and special ability profile."
+                    : "Standard roster card generated from current player data."}
+                </Text>
+                <Text style={styles.modalStats}>
+                  ATK {selectedCard.card.attack} | DEF{" "}
+                  {selectedCard.card.defense}
+                </Text>
+                <Text style={styles.modalAbility}>
+                  {selectedCard.card.special_ability ?? "No special ability."}
+                </Text>
+
+                <Pressable
+                  style={styles.modalCloseButton}
+                  onPress={() => setSelectedCard(null)}
+                >
+                  <Text style={styles.modalCloseButtonText}>Close</Text>
+                </Pressable>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -212,6 +556,34 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,
+  },
+  chipRow: {
+    gap: spacing.sm,
+    paddingTop: spacing.md,
+  },
+  chipRowCompact: {
+    gap: spacing.sm,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xs,
+  },
+  chip: {
+    backgroundColor: colors.card,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
+  },
+  chipActive: {
+    backgroundColor: colors.cardElevated,
+  },
+  chipText: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  chipTextActive: {
+    color: colors.textPrimary,
   },
   summaryText: {
     fontWeight: "700",
@@ -248,10 +620,41 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 16,
     padding: spacing.md,
+    flexDirection: "row",
+    gap: spacing.md,
+  },
+  cardPreview: {
+    width: 72,
+    height: 96,
+    borderRadius: 12,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.cardElevated,
+  },
+  cardArt: {
+    width: "100%",
+    height: "100%",
+  },
+  cardArtPlaceholder: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: spacing.sm,
+  },
+  cardArtPlaceholderText: {
+    color: colors.textSecondary,
+    fontSize: 11,
+    fontWeight: "800",
+    textAlign: "center",
+  },
+  cardContent: {
+    flex: 1,
   },
   titleRow: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     gap: spacing.sm,
   },
   cardName: {
@@ -275,9 +678,172 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
     fontWeight: "600",
   },
+  typeText: {
+    color: colors.textMuted,
+    marginTop: spacing.xs,
+    fontWeight: "600",
+    fontSize: 12,
+  },
   abilityText: {
     color: colors.textMuted,
     marginTop: spacing.sm,
     lineHeight: 18,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.72)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: spacing.lg,
+  },
+  modalCard: {
+    width: "100%",
+    maxWidth: 420,
+    backgroundColor: colors.card,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: 24,
+    padding: spacing.lg,
+  },
+  modalCardElite: {
+    backgroundColor: "#16233D",
+    shadowColor: colors.primaryGlow,
+    shadowOpacity: 0.22,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 8,
+  },
+  modalCardLegendary: {
+    borderColor: colors.danger,
+    backgroundColor: "#221623",
+    shadowColor: colors.danger,
+  },
+  modalPreview: {
+    height: 220,
+    borderRadius: 18,
+    overflow: "hidden",
+    backgroundColor: colors.cardElevated,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    position: "relative",
+  },
+  modalPreviewLegendary: {
+    backgroundColor: "#2B1825",
+  },
+  modalAccentBar: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 6,
+    zIndex: 2,
+  },
+  modalArt: {
+    width: "100%",
+    height: "100%",
+  },
+  modalArtPlaceholder: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: spacing.lg,
+  },
+  modalArtPlaceholderText: {
+    color: colors.textPrimary,
+    fontSize: 22,
+    fontWeight: "800",
+    textAlign: "center",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: spacing.sm,
+  },
+  modalHeaderContent: {
+    flex: 1,
+    gap: spacing.sm,
+  },
+  modalName: {
+    color: colors.textPrimary,
+    fontSize: 22,
+    fontWeight: "800",
+    flex: 1,
+  },
+  modalBadgeRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+  },
+  modalBadge: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: "rgba(255,255,255,0.03)",
+  },
+  modalBadgeStrong: {
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  modalBadgeText: {
+    color: colors.textPrimary,
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 0.4,
+  },
+  modalEliteBadge: {
+    borderColor: colors.warning,
+    backgroundColor: "rgba(255, 180, 84, 0.12)",
+  },
+  modalEliteBadgeText: {
+    color: colors.warning,
+  },
+  modalBadgeOrb: {
+    minWidth: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.sm,
+  },
+  modalBadgeOrbLegendary: {
+    backgroundColor: "rgba(255, 92, 122, 0.12)",
+  },
+  modalBadgeOrbText: {
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  modalMeta: {
+    color: colors.textMuted,
+    marginTop: spacing.sm,
+    fontWeight: "600",
+    lineHeight: 18,
+  },
+  modalStats: {
+    color: colors.textSecondary,
+    marginTop: spacing.sm,
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  modalAbility: {
+    color: colors.textPrimary,
+    marginTop: spacing.md,
+    lineHeight: 22,
+  },
+  modalCloseButton: {
+    alignSelf: "flex-end",
+    marginTop: spacing.lg,
+    backgroundColor: colors.primary,
+    borderRadius: 12,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+  },
+  modalCloseButtonText: {
+    color: colors.background,
+    fontWeight: "800",
   },
 });
