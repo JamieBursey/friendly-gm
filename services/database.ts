@@ -139,18 +139,85 @@ export const friendService = {
 // ============================================
 
 export const rosterService = {
+  async resolveRosterOwnerId(userId: string) {
+    const { data: existingUser } = await supabase
+      .from("users")
+      .select("public_user_id")
+      .eq("id", userId)
+      .maybeSingle();
+
+    return existingUser?.public_user_id ?? userId;
+  },
+
   /**
    * Get all rosters for a user
    */
   async getUserRosters(userId: string) {
+    const ownerId = await this.resolveRosterOwnerId(userId);
+
     const { data, error } = await supabase
       .from("gm_rosters")
       .select("*")
-      .eq("user_id", userId)
+      .eq("user_id", ownerId)
       .order("created_at", { ascending: false });
+
+    if (error && (error as any).code === "PGRST205") {
+      throw new Error(
+        "Supabase table 'public.gm_rosters' was not found. Create it in SQL Editor first.",
+      );
+    }
 
     if (error) throw error;
     return data as GMRoster[];
+  },
+
+  async saveRoster(userId: string, name: string, players: any[]) {
+    const ownerId = await this.resolveRosterOwnerId(userId);
+    const existingRosters = await this.getUserRosters(userId);
+
+    if (existingRosters.length > 0) {
+      const [currentRoster, ...extraRosters] = existingRosters;
+
+      const { data, error } = await supabase
+        .from("gm_rosters")
+        .update({
+          user_id: ownerId,
+          name,
+          players,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", currentRoster.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      if (extraRosters.length > 0) {
+        const duplicateIds = extraRosters.map((roster) => roster.id);
+        await supabase.from("gm_rosters").delete().in("id", duplicateIds);
+      }
+
+      return data as GMRoster;
+    }
+
+    const { data, error } = await supabase
+      .from("gm_rosters")
+      .insert({
+        user_id: ownerId,
+        name,
+        players,
+      })
+      .select()
+      .single();
+
+    if (error && (error as any).code === "PGRST205") {
+      throw new Error(
+        "Supabase table 'public.gm_rosters' was not found. Create it in SQL Editor first.",
+      );
+    }
+
+    if (error) throw error;
+    return data as GMRoster;
   },
 
   /**
@@ -171,18 +238,7 @@ export const rosterService = {
    * Create a new roster
    */
   async createRoster(userId: string, name: string, players: any[]) {
-    const { data, error } = await supabase
-      .from("gm_rosters")
-      .insert({
-        user_id: userId,
-        name,
-        players,
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data as GMRoster;
+    return this.saveRoster(userId, name, players);
   },
 
   /**
