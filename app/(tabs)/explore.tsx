@@ -89,6 +89,13 @@ const DIFFICULTY_INFO: Record<
 
 export default function CardGameScreen() {
   const { loading, user } = useAuth();
+  const coachUnlockContext = {
+    email: user?.email ?? null,
+    publicUserId: user?.id ?? null,
+    username:
+      (user?.user_metadata as { username?: string } | undefined)?.username ??
+      null,
+  };
 
   const [screen, setScreen] = useState<Screen>("hub");
   const [difficulty, setDifficulty] = useState<Difficulty>("normal");
@@ -232,7 +239,7 @@ export default function CardGameScreen() {
     const won = winner === "player";
     const draw = winner === null;
     const unlocksThisWin = won
-      ? sortedCoachesForDisplay(wins).filter(
+      ? sortedCoachesForDisplay(wins, coachUnlockContext).filter(
           (c) => !c.unlocked && c.coach.requiredWins <= wins,
         )
       : [];
@@ -427,7 +434,7 @@ export default function CardGameScreen() {
   // ── Coach select ─────────────────────────────────────────────────────────────
 
   if (screen === "coach") {
-    const coaches = sortedCoachesForDisplay(wins);
+    const coaches = sortedCoachesForDisplay(wins, coachUnlockContext);
     const activeCoach = coaches.find((c) => c.coach.id === selectedCoachId);
 
     return (
@@ -565,9 +572,10 @@ export default function CardGameScreen() {
 
   // ── Hub ──────────────────────────────────────────────────────────────────────
 
-  const nextCoachUnlock = sortedCoachesForDisplay(wins).find(
-    (c) => !c.unlocked,
-  );
+  const nextCoachUnlock = sortedCoachesForDisplay(
+    wins,
+    coachUnlockContext,
+  ).find((c) => !c.unlocked);
 
   return (
     <SafeAreaView style={styles.safeArea}>

@@ -26,7 +26,13 @@ export interface Coach {
   abilityFlags: Partial<MatchFlags>;
 }
 
-// ─── Roster (2 free, 4 earned) ───────────────────────────────────────────────
+export type CoachUnlockContext = {
+  email?: string | null;
+  publicUserId?: string | null;
+  username?: string | null;
+};
+
+// ─── Roster (2 free, 5 earned) ───────────────────────────────────────────────
 
 export const COACHES: Coach[] = [
   // ── FREE ────────────────────────────────────────────────────────────────────
@@ -140,7 +146,45 @@ export const COACHES: Coach[] = [
     passivePrecision: false,
     abilityFlags: { aiATKBonus: -6, aiDEFBonus: -6 },
   },
+
+  // ── EARN AT 30 WINS (or Kelly auto-access) ────────────────────────────────
+  {
+    id: "observer",
+    name: 'Kelly "The Observer" Mercer',
+    style: "Mastermind",
+    desc: "Reads every line before it forms. The strongest coach in the game.",
+    passiveText:
+      "+5 ATK, +5 DEF, win ties, precision momentum bonus, and draw 5 cards per period",
+    abilityText:
+      "Observer's Edge — this play gains +8 ATK burst, doubles ATK, ignores debuffs, and applies -10 ATK/-10 DEF to opponent (charges after 2 plays)",
+    chargeAfter: 2,
+    requiredWins: 30,
+    passiveATKBonus: 5,
+    passiveDEFBonus: 5,
+    passiveWinTies: true,
+    passiveExtraCard: true,
+    passivePrecision: true,
+    abilityFlags: {
+      penaltyShot: true,
+      playerDoubleATK: true,
+      playerImmune: true,
+      playerWinTies: true,
+      aiATKBonus: -10,
+      aiDEFBonus: -10,
+    },
+  },
 ];
+
+const OBSERVER_PRIVILEGED_ACCESS = {
+  emails: ["kellymercer8191@gmail.com", "jamie4551@gmail.com"],
+  publicUserIds: [
+    "5bc5873d-8dcf-4a3a-a536-116e4058aa23",
+    "521fbab5-b81c-4b8a-86d9-9eedea066f64",
+  ],
+  usernames: ["Kmerc8191", "Jamie Bursey"],
+};
+
+const normalize = (value?: string | null) => (value ?? "").trim().toLowerCase();
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -148,16 +192,38 @@ export function getCoach(id: string): Coach {
   return COACHES.find((c) => c.id === id) ?? COACHES[0];
 }
 
-export function isCoachUnlocked(id: string, totalWins: number): boolean {
+export function isCoachUnlocked(
+  id: string,
+  totalWins: number,
+  context?: CoachUnlockContext,
+): boolean {
+  if (id === "observer") {
+    const email = normalize(context?.email);
+    const publicUserId = normalize(context?.publicUserId);
+    const username = normalize(context?.username);
+
+    const hasObserverBypass =
+      OBSERVER_PRIVILEGED_ACCESS.emails.some((v) => normalize(v) === email) ||
+      OBSERVER_PRIVILEGED_ACCESS.publicUserIds.some(
+        (v) => normalize(v) === publicUserId,
+      ) ||
+      OBSERVER_PRIVILEGED_ACCESS.usernames.some(
+        (v) => normalize(v) === username,
+      );
+
+    if (hasObserverBypass) return true;
+  }
+
   return totalWins >= getCoach(id).requiredWins;
 }
 
 /** Return the two always-free coaches first, then unlocked ones, then locked. */
 export function sortedCoachesForDisplay(
   totalWins: number,
+  context?: CoachUnlockContext,
 ): { coach: Coach; unlocked: boolean }[] {
   return COACHES.map((coach) => ({
     coach,
-    unlocked: isCoachUnlocked(coach.id, totalWins),
+    unlocked: isCoachUnlocked(coach.id, totalWins, context),
   }));
 }
