@@ -5,7 +5,7 @@ import { typography } from "@/components/theme/typography";
 import { useAuth } from "@/contexts/AuthContext";
 import { cardService } from "@/services/cards";
 import { rosterService } from "@/services/database";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -62,7 +62,7 @@ export default function GMPlayerPicker() {
   const [selected, setSelected] = useState<PlayerProfile | null>(null);
   const [gmRoster, setGmRoster] = useState<PlayerProfile[]>([]);
 
-  const getRole = (pos?: string): "F" | "D" | "G" | "?" => {
+  const getRole = useCallback((pos?: string): "F" | "D" | "G" | "?" => {
     if (!pos) return "?";
     const p = pos.toUpperCase().trim();
 
@@ -105,25 +105,31 @@ export default function GMPlayerPicker() {
     if (p.includes("GOAL")) return "G";
 
     return "?";
-  };
+  }, []);
 
-  const getCounts = (roster: PlayerProfile[]): RosterCounts => {
-    let F = 0,
-      D = 0,
-      G = 0;
-    for (const p of roster) {
-      const role = getRole(p.position);
-      if (role === "F") F++;
-      else if (role === "D") D++;
-      else if (role === "G") G++;
-    }
-    return { F, D, G, total: roster.length };
-  };
+  const getCounts = useCallback(
+    (roster: PlayerProfile[]): RosterCounts => {
+      let F = 0,
+        D = 0,
+        G = 0;
+      for (const p of roster) {
+        const role = getRole(p.position);
+        if (role === "F") F++;
+        else if (role === "D") D++;
+        else if (role === "G") G++;
+      }
+      return { F, D, G, total: roster.length };
+    },
+    [getRole],
+  );
 
   const samePlayerId = (a: string | number, b: string | number) =>
     String(a) === String(b);
 
-  const counts = useMemo<RosterCounts>(() => getCounts(gmRoster), [gmRoster]);
+  const counts = useMemo<RosterCounts>(
+    () => getCounts(gmRoster),
+    [gmRoster, getCounts],
+  );
 
   const searchPlayers = async (name: string) => {
     const url = `${API_BASE}/api/search?q=${encodeURIComponent(name)}`;

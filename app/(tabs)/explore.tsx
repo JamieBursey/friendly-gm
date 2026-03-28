@@ -614,7 +614,7 @@ export default function CardGameScreen() {
             <Text style={styles.infoCardBody}>No deck saved yet.</Text>
           )}
           <Text style={styles.infoCardSub}>
-            Pick your 10 cards in "Build Deck"
+            Pick your 10 cards in &quot;Build Deck&quot;
           </Text>
         </View>
 
