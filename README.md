@@ -46,6 +46,50 @@ In the output, you'll find options to open the app in a
 - [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
 - [Expo Go](https://expo.dev/go)
 
+## Deploy For Free (Web)
+
+This app is configured for static web export (`dist/`) and can be hosted on free tiers.
+
+### Build locally
+
+```bash
+npm run build:web
+```
+
+Preview the production build locally:
+
+```bash
+npm run preview:web
+```
+
+### Option 1: Vercel (recommended)
+
+1. Push this repo to GitHub.
+2. Import the repo in Vercel.
+3. Vercel will read `vercel.json` automatically.
+4. Deploy.
+
+If you want to set values manually in Vercel project settings:
+
+- Build Command: `npm run build:web`
+- Output Directory: `dist`
+
+### Option 2: Netlify
+
+1. Push this repo to GitHub.
+2. Import the repo in Netlify.
+3. Netlify will read `netlify.toml` automatically.
+4. Deploy.
+
+### Environment Variables (important)
+
+Set these in your hosting dashboard:
+
+- `EXPO_PUBLIC_SUPABASE_URL`
+- `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+
+The app reads these via `app.config.js` and exposes them in `expo.extra`.
+
 ## Project Structure
 
 ```
